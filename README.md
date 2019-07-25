@@ -109,7 +109,6 @@ lsof -i:9200
 lsof -i:5601
 ```
 
-
 ## mysql8.0准备
 
 参见[MySQL8.0环境搭建](https://github.com/JimXiongGM/BigDataProject/blob/master/Documentations/MySql_8.0.md)。建立数据库`xionggm_db`
@@ -156,53 +155,122 @@ LOAD DATA INFILE '/var/lib/mysql-files/movie_infos.csv' REPLACE INTO TABLE movie
 
 
 
-## d2rq工具安装
 
-[官网在此](http://d2rq.org/getting-started)。这是一个自动将关系型数据库转为三元组的工具，只需要下载安装包和mysql的connector。运行如下命令即可
+
+##  gStore安装
+
+sudo apt-get upgrade
+sudo apt-get update
 
 ```bash
-# 需要java version >= 1.5
-java -version;
-cd xiazai;
-wget https://github.s3.amazonaws.com/downloads/d2rq/d2rq/d2rq-0.8.1.tar.gz?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAISTNZFOVBIJMK3TQ%2F20190705%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20190705T115758Z&X-Amz-Expires=300&X-Amz-SignedHeaders=host&X-Amz-Signature=fb57b739e6226da472c0fa5bc4686b7ab7bc3af357043c4477a2c5e0f89be844;
-tar -zxvf d2rq-0.8.1.tar.gz -C /opt;
-wegt https://cdn.mysql.com//Downloads/Connector-J/mysql-connector-java-5.1.47.tar.gz;
-tar -zvxf mysql-connector-java-5.1.47.tar.gz;
-cp mysql-connector-java-5.1.47/mysql-connector-java-5.1.47-bin.jar /opt/d2rq-0.8.1/lib/;
-cd /opt/d2rq-0.8.1;
-# 该操作会map xionggm_db数据库下的所有表
-generate-mapping -u root -p Candy5 -o xionggm_db_01.ttl jdbc:mysql:///xionggm_db?useSSL=false;
-# 后台启动服务
-nohup d2r-server xionggm_db_01.ttl &
-# SPARQL 测试
-d2r-query xionggm_db_01.ttl "SELECT * { ?s ?p ?o } LIMIT 10";
-# 转存为RDF nt文件
-dump-rdf -o xionggm_db_01.nt xionggm_db_01.ttl;
+cd xiazai
+# 准备好安装包
+unzip gStore-master.zip
+mv gStore-master /opt/
+cd /opt/gStore-master
+sudo ./scripts/setup/setup_ubuntu.sh
+make pre && make -j 8
 ```
-打开`http://master:2020`即可。
 
-有趣的是，该工具提供了SPARQL查询的webUI，打开`http://master:2020/snorql`即可。效果如下。
+gstore shell基本。./bin
 
-![d2rq_snorql.png](./d2rq_snorql.png)
-
-
-
-
-
-
-
-
-
-
-## 使用Google Knowledge Graph Search API
+```bash
+bin/gconsole
+connect 127.0.0.1 3305
+disconnect
+build lubm_10 ./data/LUBM_10.n3
+unload
+load lubm_10
+show
+query ./data/LUBM_q0.sql
+qiut
+```
 
 
-按照https://developers.google.com/knowledge-graph/
-在控制台中启用knowledge graph API，获得密钥
+## 导入DBpedia2016 triples文件
 
 
+## DBpediaLookup安装
 
 
 
 
+
+
+
+
+
+
+
+
+## gAnswer
+
+**要求内存大于等于16GB**
+
+```bash
+cd xiazai;
+# 准备好DBpedia2016_small.rar Ganswer.jar
+mkdir -p /opt/gAnswer_xgm/data/
+cp DBpedia2016_small.rar /opt/gAnswer_xgm/;
+cp Ganswer.jar /opt/gAnswer_xgm/;
+cd /opt/gAnswer_xgm/;
+sudo apt-get install -y unrar;
+unrar x DBpedia2016_small.rar ./data/;
+rm DBpedia2016_small.rar;
+unzip Ganswer.jar;
+java -jar Ganswer.jar;
+```
+
+显示`Server ready!`
+
+http://localhost:9999/gSolve/?data={maxAnswerNum:1, maxSparqlNum:2, question:Who is the wife of Donald Trump?} 
+
+
+
+
+
+
+
+
+
+## gAnswer中文
+
+[github地址](https://github.com/pkumod/gAnswer/tree/pkubase)
+
+
+```bash
+mkdir -p /opt/gAnswer_pkubase/data/;
+cd xiazai;
+# 该文件夹下准备好pkubase.rar pkubase-full.rar 自定义的gAnswer-0.1.2_pkubase.jar
+unrar pkubase.rar /opt/gAnswer_pkubase/data/;
+unrar pkubase-full.rar /opt/gAnswer_pkubase/data/;
+cp gAnswer-0.1.2_pkubase.jar /opt/gAnswer_pkubase/;
+# 换行符号转换
+sudo apt-get install -y tofrodos;
+fromdos /opt/gAnswer_pkubase/data/pkubase-full.txt;
+# 加载数据
+cd /opt/gStore-master;
+nohup ./bin/gbuild pku_base /opt/gAnswer_pkubase/data/pkubase-full.txt >> /logs/gstore.log &
+# cat /logs/gstore.log;
+# 查询
+./bin/gquery pku_base
+```
+
+
+
+
+- 修改`Globals.java`
+
+```java
+public static String QueryEngineIP = "127.0.0.1";
+public static String Dataset = "pku_base";
+```
+
+- 修改`GAnswer.java`
+
+```java
+String answer = gc.query("root", "xiong", "pku_base", spq.toStringForGStore2());
+List<String> inputList = FileUtil.readFile("/data/ganswer/pkubase-full.txt");
+FileUtil.writeFile(outputs, "/data/ganswer/pkubase-full_out.txt", true);
+```
 
