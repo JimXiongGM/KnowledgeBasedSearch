@@ -13,7 +13,7 @@
 
 ## <p id=1>准备
 
-本文参考网络资料，搭建Elasticsearch 7.3 + logstash 7.3 + kibana7.3环境，并使用ik分词器从mysql8.0中通过logstash导入数据到es中进行搜索。
+本文参考网络资料，搭建Elasticsearch 7.3 + logstash 7.3 + kibana 7.3环境，并从mysql 8.0中通过logstash导入数据到es中，使用ik分词器建立索引并进行搜索。
 
 将如下文件放入`/root/xiazai/`。点击可进入文件下载页面。
 
@@ -27,6 +27,8 @@
 ## <p id=2>mysql数据准备
 
 mysql环境搭建可参考[MySQL8.0环境搭建](https://github.com/JimXiongGM/BigDataProject/blob/master/Documentations/MySql_8.0.md)。
+
+此处的参考资料为[How to keep Elasticsearch synced with a RDBMS using Logstash](https://www.elastic.co/blog/how-to-keep-elasticsearch-synchronized-with-a-relational-database-using-logstash)
 
 进入mysql：`mysql -u root -p`，创建测试用表。
 
@@ -122,7 +124,7 @@ tar -xzvf logstash-7.3.0.tar.gz -C /opt/;
 # CTRL-D  to exit
 cd /opt/logstash-7.3.0/;
 
-# 修改内存设置
+# 请自行修改内存设置
 sed -i 's/-Xms1g/-Xms2g/g' ./config/jvm.options;
 sed -i 's/-Xmx1g/-Xmx10g/g' ./config/jvm.options;
 
@@ -131,6 +133,7 @@ sed -i 's/-Xmx1g/-Xmx10g/g' ./config/jvm.options;
 
 # 配置和mysql的交互
 cp /root/xiazai/mysql-connector-java-8.0.16.jar /opt/logstash-7.3.0/lib/;
+# 请自行修改数据库密码
 echo 'input {
   jdbc {
     jdbc_driver_library => "/opt/logstash-7.3.0/lib/mysql-connector-java-8.0.16.jar"
@@ -221,9 +224,22 @@ curl -X GET "localhost:9200/mysql_test_1/_search?pretty" -H 'Content-Type: appli
   "size" : 1
 }
 '
+# 展示匹配结果
+curl -X POST http://localhost:9200/mysql_test_1/_search?pretty -H 'Content-Type:application/json' -d'
+{
+    "query" : { "match" : { "client_name" : "领事馆" }},
+    "highlight" : {
+        "pre_tags" : ["<tag1>", "<tag2>"],
+        "post_tags" : ["</tag1>", "</tag2>"],
+        "fields" : {
+            "client_name" : {}
+        }
+    }
+}
+'
 ```
 
-可以看到，`领事馆`查询结果的最高分为`3.6995318`，`事馆领`查询结果的最高分为`3.6995318`。
+可以看到，`领事馆`查询结果的最高分为`3.6995318`，`事馆领`查询结果的最高分为`3.6995318`。`领事馆`被<tag>标签按字切分。
 
 ## <p id=7>使用ik分词器
 
@@ -249,6 +265,7 @@ curl -X POST http://localhost:9200/mysql_test_2/_mapping?pretty -H 'Content-Type
 curl -X GET "localhost:9200/_cat/indices?v"
 
 cd /opt/logstash-7.3.0/;
+# 请自行修改数据库密码
 echo 'input {
   jdbc {
     jdbc_driver_library => "/opt/logstash-7.3.0/lib/mysql-connector-java-8.0.16.jar"
@@ -300,9 +317,22 @@ curl -X GET "localhost:9200/mysql_test_2/_search?pretty" -H 'Content-Type: appli
   "size" : 1
 }
 '
+# 展示匹配结果
+curl -X POST http://localhost:9200/mysql_test_2/_search?pretty -H 'Content-Type:application/json' -d'
+{
+    "query" : { "match" : { "client_name" : "领事馆" }},
+    "highlight" : {
+        "pre_tags" : ["<tag1>", "<tag2>"],
+        "post_tags" : ["</tag1>", "</tag2>"],
+        "fields" : {
+            "client_name" : {}
+        }
+    }
+}
+'
 ```
 
-可以看到，`领事馆`查询结果的最高分为`0.95738393`，`事馆领`查询结果的最高分为`1.850861`。
+可以看到，`领事馆`查询结果的最高分为`0.95738393`，`事馆领`查询结果的最高分为`1.850861`。  且`领事馆`被<tag>标签正确分割。
 
 
 ## <p id=8>安装Kibana
