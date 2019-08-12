@@ -332,7 +332,7 @@ curl -X POST http://localhost:9200/mysql_test_2/_search?pretty -H 'Content-Type:
 '
 ```
 
-可以看到，`领事馆`查询结果的最高分为`0.95738393`，`事馆领`查询结果的最高分为`1.850861`。  且`领事馆`被<tag>标签正确分割。
+可以看到，`领事馆`查询结果的最高分为`0.95738393`，`事馆领`查询结果的最高分为`1.850861`。且`领事馆`被<tag>标签正确分割。
 
 
 ## <p id=8>安装Kibana
@@ -353,7 +353,7 @@ server.host: "0.0.0.0"
 i18n.locale: "zh-CN"
 ' >> ./config/kibana.yml;
 # 后台启动
-nohup bin/kibana --allow-root &
+nohup /opt/kibana-7.3.0-linux-x86_64/bin/kibana --allow-root >> /logs/kibana.log &
 ```
 
 访问`http://localhost:5601`即可。

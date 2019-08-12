@@ -539,3 +539,140 @@ curl -X PUT "localhost:9200/my_index?pretty" -H 'Content-Type: application/json'
 '
 ```
 
+
+## Query DSL » Specialized queries » Distance feature query
+
+
+curl -X PUT "localhost:9200/items?pretty" -H 'Content-Type: application/json' -d'
+{
+  "mappings": {
+    "properties": {
+      "name": {
+        "type": "keyword"
+      },
+      "production_date": {
+        "type": "date"
+      },
+      "location": {
+        "type": "geo_point"
+      }
+    }
+  }
+}
+'
+
+
+curl -X PUT "localhost:9200/items/_doc/1?refresh&pretty" -H 'Content-Type: application/json' -d'
+{
+  "name" : "chocolate",
+  "production_date": "2018-02-01",
+  "location": [-71.34, 41.12]
+}
+'
+curl -X PUT "localhost:9200/items/_doc/2?refresh&pretty" -H 'Content-Type: application/json' -d'
+{
+  "name" : "chocolate",
+  "production_date": "2018-01-01",
+  "location": [-71.3, 41.15]
+}
+'
+curl -X PUT "localhost:9200/items/_doc/3?refresh&pretty" -H 'Content-Type: application/json' -d'
+{
+  "name" : "chocolate",
+  "production_date": "2017-12-01",
+  "location": [-71.3, 41.12]
+}
+'
+
+- Boost documents based on date
+
+
+curl -X GET "localhost:9200/items/_search?pretty" -H 'Content-Type: application/json' -d'
+{
+  "query": {
+    "bool": {
+      "must": {
+        "match": {
+          "name": "chocolate"
+        }
+      },
+      "should": {
+        "distance_feature": {
+          "field": "production_date",
+          "pivot": "7d",
+          "origin": "now"
+        }
+      }
+    }
+  }
+}
+'
+
+- Boost documents based on location
+
+
+curl -X GET "localhost:9200/items/_search?pretty" -H 'Content-Type: application/json' -d'
+{
+  "query": {
+    "bool": {
+      "must": {
+        "match": {
+          "name": "chocolate"
+        }
+      },
+      "should": {
+        "distance_feature": {
+          "field": "location",
+          "pivot": "1000m",
+          "origin": [-71.3, 41.15]
+        }
+      }
+    }
+  }
+}
+'
+## Painless Scripting Language [7.3] » Painless contexts » Ingest processor context
+
+```bash
+cd /root/xiazai/;
+head -n 100 seats.json > seats_demo.json;
+curl -X DELETE localhost:9200/seats
+curl -X POST "localhost:9200/seats/seat?pretty" -H 'Content-Type: application/json' -d'
+{
+  "mappings": {
+    "properties": {
+      "theatre":  { "type": "keyword" },
+      "play":     { "type": "text"    },
+      "actors":   { "type": "text"    },
+      "row":      { "type": "integer" },
+      "number":   { "type": "integer" },
+      "cost":     { "type": "double"  },
+      "sold":     { "type": "boolean" },
+      "datetime": { "type": "date"    },
+      "date":     { "type": "keyword" },
+      "time":     { "type": "keyword" }
+    }
+  }
+}
+'
+
+
+curl -X PUT "localhost:9200/_ingest/pipeline/seats?pretty" -H 'Content-Type: application/json' -d'
+{
+    "description": "update datetime for seats",
+    "processors": [
+      {
+        "script": {
+          "source": "String[] split(String s, char d) { int count = 0; for (char c : s.toCharArray()) { if (c == d) { ++count; } } if (count == 0) { return new String[] {s}; } String[] r = new String[count + 1]; int i0 = 0, i1 = 0; count = 0; for (char c : s.toCharArray()) { if (c == d) { r[count++] = s.substring(i0, i1); i0 = i1 + 1; } ++i1; } r[count] = s.substring(i0, i1); return r; } String[] dateSplit = split(ctx.date, (char)\"-\"); String year = dateSplit[0].trim(); String month = dateSplit[1].trim(); if (month.length() == 1) { month = \"0\" + month; } String day = dateSplit[2].trim(); if (day.length() == 1) { day = \"0\" + day; } boolean pm = ctx.time.substring(ctx.time.length() - 2).equals(\"PM\"); String[] timeSplit = split(ctx.time.substring(0, ctx.time.length() - 2), (char)\":\"); int hours = Integer.parseInt(timeSplit[0].trim()); int minutes = Integer.parseInt(timeSplit[1].trim()); if (pm) { hours += 12; } String dts = year + \"-\" + month + \"-\" + day + \"T\" + (hours < 10 ? \"0\" + hours : \"\" + hours) + \":\" + (minutes < 10 ? \"0\" + minutes : \"\" + minutes) + \":00+08:00\"; ZonedDateTime dt = ZonedDateTime.parse(dts, DateTimeFormatter.ISO_OFFSET_DATE_TIME); ctx.datetime = dt.getLong(ChronoField.INSTANT_SECONDS)*1000L;"
+        }
+      }
+    ]
+}
+'
+
+curl -X POST localhost:9200/seats/seat/_bulk?pipeline=seats -H "Content-Type: application/x-ndjson" --data-binary "@/root/xiazai/seats_demo.json"
+
+curl -X GET "localhost:9200/seats/seat/1?pretty"
+```
+
+
